@@ -1,0 +1,2 @@
+<GetWeather> -> On [April:B-date] first I need a flight going from [Phoenix:B-city] to [San:B-city] [Diego:I-city]
+<GetWeather> -> I would like a flight from [Orlando:B-city] to [Salt:B-city] [Lake:I-city] [City:I-city] for [April:B-date] First on [Delta:B-city] airlines

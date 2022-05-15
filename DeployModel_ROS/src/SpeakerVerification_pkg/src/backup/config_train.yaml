@@ -1,0 +1,32 @@
+device: "cuda"
+train_list: dataset/train_def.txt
+test_list: dataset/val_def.txt
+save_path: backup/
+
+model: RawNet2v2
+
+max_epoch: 1000
+batch_size: 8
+nDataLoaderThread: 0
+optimizer: AdaBelief
+criterion: AAmSoftmax
+nPerSpeaker: 2
+
+n_mels: 80
+margin: 0.2
+scale: 30
+lr: 0.001
+
+callbacks: steplr
+
+max_frames: 300
+eval_frames: 300
+sample_rate: 16000
+
+nClasses: 15
+test_interval: -1
+step_size: 10
+es_patience: 15
+
+augment_chain: time_domain spec_domain
+# initial_model_infer: backup/Raw_ECAPA/model/best_state.model

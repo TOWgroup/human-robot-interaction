@@ -1,0 +1,27 @@
+device: "cuda"
+model: ECAPA_TDNN
+
+test_list: dataset/val_def.txt # full test
+
+# test_list: dataset/train_callbot_v2/val_def_50.txt  # half test
+
+nDataLoaderThread: 1
+criterion: ARmSoftmax
+sample_rate: 16000
+nClasses: 14142
+eval_frames: 100
+max_frames: 100
+
+batch_size: 64
+n_mels: 80
+step_size: 5
+
+augment: False
+test_recognize: False
+cohorts_path: backup/Raw_ECAPA/cohorts_callbot.npy
+scoring_mode: cosine
+
+save_path: backup
+
+initial_model_infer: backup/ECAPA_TDNN/ARmSoftmax/model/best_state.model
+# Raw_ECAPA

@@ -1,0 +1,105 @@
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.7269232167643969
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 1.0
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9989947567418872
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9974215688715848
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9930259604933613
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9932821084236427
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.997245152976197
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9961649125034444
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9964601080871782
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9931167404421808
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9970546495291894
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9968386014346389
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9948935255834029
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9937025136985365
+>-------------------------------------------------<
+>20220424<
+Ref: 
+test_audio_ref_0.wav
+Com: 
+test_audio_com_0.wav
+Truewith score: 0.9970177646948654
+>-------------------------------------------------<

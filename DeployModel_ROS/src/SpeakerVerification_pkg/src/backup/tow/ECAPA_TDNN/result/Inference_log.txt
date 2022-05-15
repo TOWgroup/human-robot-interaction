@@ -1,0 +1,10 @@
+
+[INFER]------------------2022-03-25 01:52:45------------------
+[Evaluation] result on: [dataset/tow/val_def.txt] with [backup/tow/ECAPA_TDNN/model/best_state.model]
+Best sum rate 6.27340823970038 at [0.46007568, 4.02621722846442, 2.2471910112359605]
+EER 3.1835205992509374 at threshold 0.47937431931495667
+AUC 99.46152281558165
+Gmean result:
+EER: 2.9991468624869344% at threshold 0.4620993733406067
+ ACC: 97.00085313751306%
+=================>
