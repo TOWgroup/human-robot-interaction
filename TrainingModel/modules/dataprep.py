@@ -23,6 +23,8 @@ from processing.vad_tool import VAD
 from processing.dataset import get_audio_properties, read_blacklist
 import contextlib
 
+SAMPLE_RATE = 16000
+
 
 def get_audio_path(folder):
     """
@@ -179,7 +181,7 @@ def augmentation(args, audio_paths, mode='train', max_frames=200, step_save=5, *
     augment_engine = AugmentWAV(musan_path=musan_path,
                                 rir_path=rir_path,
                                 max_frames=max_frames,
-                                sample_rate=8000,target_db=None)
+                                sample_rate=SAMPLE_RATE,target_db=None)
     list_audios = []
 
     for idx, fpath in enumerate(tqdm(augment_audio_paths, unit='files', desc=f"Augmented process")):
@@ -187,7 +189,7 @@ def augmentation(args, audio_paths, mode='train', max_frames=200, step_save=5, *
         audio = loadWAV(fpath, max_frames=max_frames, 
                         evalmode=False, 
                         augment=False, 
-                        sample_rate=8000, 
+                        sample_rate=SAMPLE_RATE, 
                         augment_chain=[])
         
         augtypes = ['rev', 'noise', 'both']
@@ -212,7 +214,7 @@ def augmentation(args, audio_paths, mode='train', max_frames=200, step_save=5, *
 
             if os.path.exists(save_path):
                 os.remove(save_path)  
-            sf.write(str(save_path), audio_data, 8000)
+            sf.write(str(save_path), audio_data, SAMPLE_RATE)
             
     print('Done!')
 
@@ -268,10 +270,6 @@ class DataGenerator():
 #                 f.write(f'{path}\n')
         data_folder = list(set([os.path.split(path)[0]
                            for path in data_paths]))
-
-        with open(os.path.join(self.args.save_dir, 'data_folders.txt'), 'w') as f:
-            for path in data_folder:
-                f.write(f'{path}\n')
                 
         non_augment_path = list(
             filter(lambda x: 'augment' not in str(x), data_paths))
@@ -342,7 +340,7 @@ class DataGenerator():
                 filepaths = list(set(filepaths).difference(set(blist)))           
                 
             # check duration, sr
-            filepaths = check_valid_audio(filepaths, 1.0, 8000)
+            filepaths = check_valid_audio(filepaths, 1.0, SAMPLE_RATE)
 
             # checknumber of files
             if len(filepaths) < lower_num:
@@ -389,7 +387,7 @@ class DataGenerator():
         val_writer.close()
   
     
-def check_valid_audio(files, duration_lim=1.5, sr=8000):
+def check_valid_audio(files, duration_lim=1.5, sr=SAMPLE_RATE):
     filtered_list = []
     files = [str(path) for path in files]
     

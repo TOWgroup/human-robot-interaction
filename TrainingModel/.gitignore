@@ -4,7 +4,9 @@ checkpoint/*.model
 checkpoint/*.npy
 config/
 exp/
-dataset/
+dataset/dataset_tow
+dataset/*.zip
+dataset/*.txt
 venv/
 .venv/
 Winvenv/
