@@ -1,43 +1,53 @@
 import glob
 import os
+import subprocess
 import sys
 import time
-import subprocess
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.distributed as dist
+# from torch.utils.tensorboard import SummaryWriter
 
 from callbacks.earlyStopping import *
 from dataloader import get_data_loader
-from model import SpeakerNet, WrappedModel
-from utils import tuneThresholdfromScore, read_log_file, plot_from_file, cprint
+from model import SpeakerNet
+from utils import cprint, plot_from_file, read_log_file, tuneThresholdfromScore
 
-from torch.utils.tensorboard import SummaryWriter
 ###
 
-def train(gpu, ngpus_per_node, args):
-    model_save_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/model")
-    result_save_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/result")
-    config_clone_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/config")
-    
-    # TensorBoard
-    writer = SummaryWriter(log_dir=f"{result_save_path}/runs")
-    os.makedirs(f"{result_save_path}/runs", exist_ok=True)
+
+def train(args):
+    # Initialise directories
+    model_save_path = os.path.join(
+        args.save_path, f"{args.model}/{args.criterion}/model")
+    os.makedirs(model_save_path, exist_ok=True)
+    result_save_path = os.path.join(
+        args.save_path, f"{args.model}/{args.criterion}/result")
+    os.makedirs(result_save_path, exist_ok=True)
+    config_clone_path = os.path.join(
+        args.save_path, f"{args.model}/{args.criterion}/config")
+
+    if not os.path.exists(config_clone_path):
+        os.makedirs(config_clone_path, exist_ok=True)
+        if args.config is not None:
+            config_dir = '/'.join(str(args.config).split('/')[:-1])
+            subprocess.call(
+                f"cp -R {config_dir}/*.yaml {config_clone_path}", shell=True)
+
+    # # TensorBoard
+    # writer = SummaryWriter(log_dir=f"{result_save_path}/runs")
+    # os.makedirs(f"{result_save_path}/runs", exist_ok=True)
 
     # init parameters
     it = 1
     min_loss = float("inf")
     min_eer = float("inf")
-    
+
     # load state from log file
     if os.path.isfile(os.path.join(model_save_path, "model_state_log.txt")):
-        start_it, start_lr, _ = read_log_file(os.path.join(model_save_path, "model_state_log.txt"))
+        start_it, start_lr, _ = read_log_file(
+            os.path.join(model_save_path, "model_state_log.txt"))
     else:
         start_it = 1
-        start_lr = args.lr
-                
+
     # Load model weights
     model_files = glob.glob(os.path.join(model_save_path, 'model_state_*.pt'))
     model_files.sort()
@@ -57,47 +67,14 @@ def train(gpu, ngpus_per_node, args):
             it = int(start_it)
         else:
             it = 1
-        
+
     # Initialise data loader
     train_loader = get_data_loader(args.train_list, **vars(args))
     max_iter_size = len(train_loader) // args.nPerSpeaker
-    
+
     # Load models
-    s = SpeakerNet(**dict(vars(args), T_max = max_iter_size))
-    # setup multi gpus
-        # init parallelism create net-> load weight -> add to parallelism 
-    try:
-            if torch.cuda.device_count() > 1:
-                print("Let's use", torch.cuda.device_count(), "GPUs!")
-                # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-                s.__S__ = nn.DataParallel(s.__S__, device_ids=[i for i in range(torch.cuda.device_count())])
-            s.__S__ = s.__S__.to(args.device)
-    except Exception as e:
-        print(e)
-        s = s.to(args.device)
-        
-#     try:
-#         if args.distributed:
-#             args.gpu = gpu
-#             os.environ['MASTER_ADDR']='localhost'
-#             os.environ['MASTER_PORT']=args.port
+    s = SpeakerNet(**dict(vars(args), T_max=max_iter_size)).to(args.device)
 
-#             dist.init_process_group(backend='nccl', world_size=ngpus_per_node, rank=args.gpu)
-
-#             torch.cuda.set_device(args.gpu)
-#             s.cuda(args.gpu)
-
-#             s = torch.nn.parallel.DistributedDataParallel(s, device_ids=[args.gpu], find_unused_parameters=True)
-
-#             print('Loaded the model on GPU {:d}'.format(args.gpu))
-
-#         else:
-#             s = WrappedModel(s).cuda(args.gpu)
-            
-#     except Exception as e:
-#         print(e)
-#         s = s.to(args.device)
-        
     if args.initial_model:
         s.loadParameters(args.initial_model)
         print("Model %s loaded!" % args.initial_model)
@@ -112,13 +89,18 @@ def train(gpu, ngpus_per_node, args):
         print("Train model from scratch!")
         it = 1
         start_lr = args.lr
-                   
 
+    # init parallelism create net-> load weight -> add to parallelism
+#     if torch.cuda.device_count() > 1:
+#         print("Let's use", torch.cuda.device_count(), "GPUs!")
+#         # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+#         s.__S__ = nn.DataParallel(s.__S__, device_ids=[i for i in range(torch.cuda.device_count())])
+#     s.__S__ = s.__S__.to(args.device)
 
     # Write args to score_file
-    settings_file_path = os.path.join(result_save_path , 'settings.txt')
+    settings_file_path = os.path.join(result_save_path, 'settings.txt')
     settings_file = open(settings_file_path, 'a+')
-    score_file_path = os.path.join(result_save_path , 'scores.txt')
+    score_file_path = os.path.join(result_save_path, 'scores.txt')
     score_file = open(score_file_path, "a+")
 
     # summary settings
@@ -134,7 +116,7 @@ def train(gpu, ngpus_per_node, args):
     # define early stop
     if args.early_stop:
         early_stopping = EarlyStopping(patience=args.es_patience)
-    
+
     top_count = 1
     # Training loop
     while True:
@@ -145,17 +127,20 @@ def train(gpu, ngpus_per_node, args):
 
         # Train network
         loss, train_acc = s.fit(loader=train_loader, epoch=it)
-        
+
         # save best model
         if loss == min(min_loss, loss):
-            cprint(text=f"[INFO] Loss reduce from {min_loss} to {loss}. Save the best state", fg='y')
+            cprint(
+                text=f"[INFO] Loss reduce from {min_loss} to {loss}. Save the best state", fg='y')
             s.saveParameters(model_save_path + "/best_state.pt")
 
-            s.saveParameters(model_save_path + f"/best_state_top{top_count}.pt")
-            top_count = (top_count + 1) if top_count <= 3 else 1  # to save top 3 of best_state               
+            s.saveParameters(model_save_path +
+                             f"/best_state_top{top_count}.pt")
+            # to save top 3 of best_state
+            top_count = (top_count + 1) if top_count <= 3 else 1
             if args.early_stop:
                 early_stopping.counter = 0  # reset counter of early stopping
-        
+
         min_loss = min(min_loss, loss)
 
         # Validate and save
@@ -182,8 +167,8 @@ def train(gpu, ngpus_per_node, args):
                 s.saveParameters(model_save_path + "/last_state.pt")
             else:
                 s.saveParameters(model_save_path + "/model_state_%06d.pt" % it)
-               
-            with open(os.path.join(result_save_path , "/val_log.txt"), 'a+') as log_file:
+
+            with open(os.path.join(result_save_path, "/val_log.txt"), 'a+') as log_file:
                 log_file.write(f"Epoch:{it}, LR:{max(clr)}, EER: {result[1]}")
 
             plot_from_file(result_save_path, show=False)
@@ -193,17 +178,17 @@ def train(gpu, ngpus_per_node, args):
             score_file.write("IT %d, LR %f, TEER/TAcc %2.2f, TLOSS %f\n" %
                              (it, max(clr), train_acc, loss))
 
-            with open(os.path.join(model_save_path , "model_state_log.txt"), 'w+') as log_file:
+            with open(os.path.join(model_save_path, "model_state_log.txt"), 'w+') as log_file:
                 log_file.write(f"Epoch:{it}, LR:{max(clr)}, EER: {0}")
 
             score_file.flush()
-            
+
             plot_from_file(result_save_path, show=False)
 
         if it >= args.max_epoch:
             score_file.close()
             settings_file.close()
-            writer.close()
+            # writer.close()
             sys.exit(1)
 
         if args.early_stop:
@@ -211,11 +196,11 @@ def train(gpu, ngpus_per_node, args):
             if early_stopping.early_stop:
                 score_file.close()
                 settings_file.close()
-                writer.close()
+                # writer.close()
                 sys.exit(1)
-                
-        writer.add_scalar('Loss/train', loss, it)
-        writer.add_scalar('Accuracy/train', train_acc, it)
+
+        # writer.add_scalar('Loss/train', loss, it)
+        # writer.add_scalar('Accuracy/train', train_acc, it)
 
         it += 1
 

@@ -19,9 +19,8 @@ from sklearn.metrics import confusion_matrix, roc_curve
 from sklearn.metrics import fbeta_score, accuracy_score
 
 from model import SpeakerNet
-from utils import tuneThresholdfromScore, ComputeErrorRates, ComputeMinDcf
+from utils import tuneThresholdfromScore
 
-# ---------------------------------//
 
 def inference(args):
     model = SpeakerNet(**vars(args))
@@ -88,11 +87,6 @@ def inference(args):
         # results['prec_recall'] = [precision, recall, fscore[ixPR], thresholds_[ixPR]]
 
         result = tuneThresholdfromScore(sc, lab, target_fa) 
-        
-        ####
-        fnrs, fprs, thresholds = ComputeErrorRates(sc, lab)
-        mindcf, threshold = ComputeMinDcf(fnrs, fprs, thresholds, args.dcf_p_target, args.dcf_c_miss, args.dcf_c_fa)
-        ####
 
         # print('tfa [thre, fpr, fnr]')
         best_sum_rate = 999
@@ -106,7 +100,7 @@ def inference(args):
         
         print("\n[RESULTS]\nROC:",
               f"Best sum rate {best_sum_rate} at {best_tfa}, AUC {result['roc'][2]}\n",
-              f">> EER {result['roc'][1]}% min-DCF {mindcf:.5f} at threshold {result['roc'][-1]}\n",
+              f">> EER {result['roc'][1]}% at threshold {result['roc'][-1]}\n",
               f">> Gmean result: \n>>> EER: {(1 - result['gmean'][1]) * 100}% at threshold {result['gmean'][2]}\n>>> ACC: {result['gmean'][1] * 100}%\n",
               f">> F-score {result['prec_recall'][2]}% at threshold {result['prec_recall'][-1]}\n")
         
@@ -171,7 +165,6 @@ def inference(args):
 
     ######################################## Test pair by pair
     if args.test_by_pair is True:
-        
         model.test_each_pair(args.test_path,
                              cohorts_path=args.cohorts_path,
                              thre_score=threshold,
@@ -183,7 +176,7 @@ def inference(args):
     ###################################### Prepare embeddings for cohorts/verification
     if args.prepare is True:
         model.prepare(eval_frames=args.eval_frames,
-                      source=args.train_list,
+                      from_path=args.test_list,
                       save_path=args.cohorts_path,
                       num_eval=num_eval,
                       prepare_type=args.prepare_type)

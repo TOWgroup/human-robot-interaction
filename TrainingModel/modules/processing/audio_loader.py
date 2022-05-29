@@ -6,27 +6,26 @@ import time
 import wave
 
 import numpy as np
-
 import soundfile as sf
 from pydub import AudioSegment
-
 from scipy import signal
 from scipy.io import wavfile
 
-from .augment import (random_augment_speed, random_augment_pitch_shift, random_augment_volume, gain_target_amplitude)
-from .wav_conversion import segment_to_np, np_to_segment
+from .augment import (gain_target_amplitude, random_augment_pitch_shift,
+                      random_augment_speed, random_augment_volume)
+from .wav_conversion import np_to_segment, segment_to_np
 
 
 def random_augment_audio(audio_seg, p=[0, 0.25, 0.25, 0.25, 0.25]):
     aug_types = ['all', 'speed', 'pitch', 'volume', 'none']
     aug_type = np.random.choice(aug_types, p=p)
-    
+
     if aug_type == 'all':
         # drop chunk
         '''Upcoming'''
         # augment speed
         audio_seg = random_augment_speed(audio_seg, 0.95, 1.05)
-        # pitch shift 
+        # pitch shift
         audio_seg = random_augment_pitch_shift(audio_seg, -0.5, 0.5)
         # augment volume
         audio_seg = random_augment_volume(audio_seg, volume=6)
@@ -38,13 +37,15 @@ def random_augment_audio(audio_seg, p=[0, 0.25, 0.25, 0.25, 0.25]):
         audio_seg = random_augment_volume(audio_seg, volume=6)
     else:
         pass
-        
+
     return audio_seg
 
 # ================================================Utils============================================
-def loadWAV(audio_source, max_frames, 
-            evalmode=True, num_eval=10, sample_rate=8000, 
-            augment=False, augment_chain=None, target_db=None, 
+
+
+def loadWAV(audio_source, max_frames,
+            evalmode=True, num_eval=10, sample_rate=16000,
+            augment=False, augment_chain=None, target_db=None,
             read_mode='pydub', **kwargs):
     '''Load audio form .wav file and return as the np array
 
@@ -60,7 +61,7 @@ def loadWAV(audio_source, max_frames,
         ([ndarray]): audio_array
     '''
     if isinstance(audio_source, str):
-        if read_mode == 'sf': 
+        if read_mode == 'sf':
             audio, sample_rate = sf.read(audio_source)
         else:
             audio_seg = AudioSegment.from_file(audio_source)
@@ -76,23 +77,23 @@ def loadWAV(audio_source, max_frames,
 
             # convert to numpy with soundfile mormalize format
             audio = segment_to_np(audio_seg, normalize=True)
-        
+
     elif isinstance(audio_source, np.ndarray):
         audio = audio_source
     else:
-        raise "Invalid format of audio source, available: str, ndarray" 
-      
+        raise "Invalid format of audio source, available: str, ndarray"
+
     audiosize = audio.shape[0]
-    
+
     # Maximum audio length counted in frames
-    ## hoplength is 160, winlength is 400 -> total length  = winlength- hop_length + max_frames * hop_length
-    ## get the winlength 25ms, hop 10ms
+    # hoplength is 160, winlength is 400 -> total length  = winlength- hop_length + max_frames * hop_length
+    # get the winlength 25ms, hop 10ms
     hoplength = 10e-3 * sample_rate
     winlength = 25e-3 * sample_rate
-    
+
     if max_frames > 0:
         max_audio = int(max_frames * hoplength + (winlength - hoplength))
-        
+
         if audiosize <= max_audio:
             shortage = max_audio - audiosize + 1
             audio = np.pad(audio, (0, shortage), 'wrap')
@@ -108,7 +109,7 @@ def loadWAV(audio_source, max_frames,
 
         feats = []
         if evalmode and num_eval == 0:
-            feats.append(audio)       
+            feats.append(audio)
         else:
             for asf in startframe:
                 feats.append(audio[int(asf):int(asf) + max_audio])
@@ -119,48 +120,47 @@ def loadWAV(audio_source, max_frames,
     else:
         return audio
 
-## Environment corruption
+# Environment corruption
+
+
 class AugmentWAV(object):
     def __init__(self, musan_path, rir_path, max_frames, sample_rate=8000, target_db=None):
         self.sr = sample_rate
         self.target_db = target_db
-        
+
         hop_length = 10e-3 * self.sr
         win_length = 25e-3 * self.sr
-        
+
         self.max_frames = max_frames
         self.max_audio = int(max_frames * hop_length + (win_length - hop_length))
 
         self.noisetypes = ['noise', 'speech', 'music']
 
         self.noisesnr = {
-            'noise': [0, 5],
-            'speech': [3, 20],
-            'music': [5, 15],
-            'noise_vad': [0, 15],
-            'noise_rirs': [0, 15]
+            'noise': [0, 12],
+            'speech': [2, 12],
+            'music': [0, 12],
+            'noise_vad': [0, 12]
         }
-        self.num_noise = {'noise': [1, 1], 'speech': [3, 7], 'music': [1, 1], 'noise_vad': [1,1], 'noise_rirs': [1, 1]}
+        self.num_noise = {'noise': [1, 1], 'speech': [3, 7], 'music': [1, 1], 'noise_vad': [1, 1]}
         self.noiselist = {}
 
         augment_files = glob.glob(os.path.join(musan_path, '*/*/*/*.wav'))
+
         for file in augment_files:
             if not file.split('/')[-4] in self.noiselist:
                 self.noiselist[file.split('/')[-4]] = []
             self.noiselist[file.split('/')[-4]].append(file)
-        
+
+        self.rir_files = glob.glob(os.path.join(rir_path, '*/*/*.wav'))
+
         # custom noise use additive noise latter
         noise_vad_files = glob.glob("dataset/noise_vad/noise_vad/*/*.wav")
         for noise_file in noise_vad_files:
-            self.noiselist.setdefault('noise_vad', []).append(noise_file)
-        
-        # noise from rirs noise
-        rir_noise_files = glob.glob(os.path.join('dataset/RIRS_NOISES/pointsource_noises/', '*.wav')) + glob.glob(os.path.join('dataset/RIRS_NOISES/real_rirs_isotropic_noises/', '*.wav')) 
-        for noise_file in rir_noise_files:
-            self.noiselist.setdefault('noise_rirs', []).append(noise_file)
-            
-        # RIRS_NOISES/simulated_rirs/ + smallroom/Room001/Room001-00001.wav
-        self.rir_files = glob.glob(os.path.join(rir_path, '*/*/*.wav'))
+            if noise_file.split('/')[-3] not in self.noiselist:
+                self.noiselist[noise_file.split('/')[-3]] = []
+            self.noiselist[noise_file.split('/')[-3]].append(noise_file)
+        print(len(self.rir_files), len(augment_files))
 
     def additive_noise(self, noisecat, audio):
 
@@ -187,8 +187,7 @@ class AugmentWAV(object):
         aug_audio = signal.convolve(audio, rir, mode='full')[:, :self.max_audio]
         return aug_audio
 
-    
-    
+
 """
 Note for 
 with open(audio_path,'rb') as rf:

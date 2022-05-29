@@ -1,34 +1,25 @@
 import argparse
 import os
-import subprocess
-import torch.distributed as dist
-import torch.multiprocessing as mp
 
+from export import *
 from inference import inference
 from trainer import train
 from utils import read_config
-from export import *
+
 
 def main(args):
     if args.do_train:
         # TODO: train model
-        try:
-            if args.distributed:
-                npugs = torch.cuda.device_count()
-                mp.spawn(train, nprocs=npugs, args=(npugs, args))
-            else:
-                train(0, None, args)
-        except:
-            train(0, None, args)
+        train(args)
     elif args.do_infer:
         # TODO: evaluate model
         inference(args)
     elif args.do_export:
         export_model(args, check=True)
     else:
-        raise 'Wrong main mode, available: do_train, do_infer, do_export'
+        raise 'wrong mode'
 
-#--------------------------------------------------------------------------------------#
+
 parser = argparse.ArgumentParser(description="SpeakerNet")
 if __name__ == '__main__':
     # YAML
@@ -38,25 +29,6 @@ if __name__ == '__main__':
     parser.add_argument('--do_train', action='store_true', default=False)
     parser.add_argument('--do_infer', action='store_true', default=False)
     parser.add_argument('--do_export', action='store_true', default=False)
-    
-    # Device settings
-    parser.add_argument('--device',
-                        type=str,
-                        default="cpu",
-                        help='cuda or cpu')
-    parser.add_argument('--distributed', 
-                        action='store_true', 
-                        default=True, 
-                        help='Decise wether use multi gpus')
-    ## Distributed and mixed precision training
-    parser.add_argument('--port',           
-                        type=str,   
-                        default="8888", 
-                        help='Port for distributed training, input as text');
-    parser.add_argument('--mixedprec',      
-                        dest='mixedprec',   
-                        action='store_true', 
-                        help='Enable mixed precision training')
 
     # Data loader
     parser.add_argument('--max_frames',
@@ -75,6 +47,18 @@ if __name__ == '__main__':
                         type=int,
                         default=50,
                         help='Maximum number of epochs')
+
+    # Augmentation
+    parser.add_argument('--augment',
+                        action='store_true',
+                        default=False,
+                        help='Augment input')
+    parser.add_argument('--augment_chain',
+                        nargs='+',
+                        default=None,
+                        help='Augment input chain')
+
+    # Batch settings
     parser.add_argument('--batch_size',
                         type=int,
                         default=128,
@@ -86,23 +70,18 @@ if __name__ == '__main__':
     parser.add_argument('--nDataLoaderThread',
                         type=int,
                         default=2,
-                        help='# of loader threads')    
+                        help='Number of loader threads')
+
     parser.add_argument('--nPerSpeaker',
                         type=int,
                         default=2,
-                        help='# of utterances per speaker per batch a.k.a sub centers')   
-    
-    # Augmentation
-    parser.add_argument('--augment',
-                        action='store_true',
-                        default=False,
-                        help='Augment input')
-    parser.add_argument('--augment_chain',
-                        nargs='+',
-                        default=None,
-                        help='Augment input chain')
-    
+                        help='Number of utterances per speaker per batch, only for metric learning based losses')
+
     # Training details
+    parser.add_argument('--device',
+                        type=str,
+                        default="cpu",
+                        help='cuda or cpu')
     parser.add_argument('--model',
                         type=str,
                         default="ResNetSE34V2",
@@ -118,9 +97,9 @@ if __name__ == '__main__':
     parser.add_argument('--lib',
                         type=str,
                         default='nnAudio',
-                        help='Libray for Features extractions. Available: nnAudio, torchaudio')    
-    
-    # Model definition 
+                        help='Libray for Features extractions. Available: nnAudio, torchaudio')
+
+    # Model definition
     parser.add_argument('--n_mels',
                         type=int,
                         default=64,
@@ -140,7 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('--nClasses',
                         type=int,
                         default=400,
-                        help='Number of speakers in the softmax layer, only for softmax-based losses')    
+                        help='Number of speakers in the softmax layer, only for softmax-based losses')
 
     # Optimizer
     parser.add_argument('--optimizer',
@@ -152,13 +131,13 @@ if __name__ == '__main__':
                         default="steplr",
                         help='Learning rate scheduler: steplr or reduceOnPlateau')
     parser.add_argument('--step_size',
-                       type=int,
-                       default=5,
-                       help='step of learning rate scheduler')
+                        type=int,
+                        default=5,
+                        help='step of learning rate scheduler')
     parser.add_argument('--scheduler_step',
-                       type=int,
-                       default=5,
-                       help='patience of learning rate scheduler')
+                        type=int,
+                        default=5,
+                        help='patience of learning rate scheduler')
     parser.add_argument('--early_stop',
                         action='store_true',
                         default=False,
@@ -206,12 +185,12 @@ if __name__ == '__main__':
                         default=30.0,
                         help='Loss scale, only for some loss functions')
 
-
     # Load and save
     parser.add_argument('--test_interval',
                         type=int,
                         default=10,
                         help='Test and save every [test_interval] epochs')
+
     parser.add_argument('--save_model_last',
                         type=bool,
                         default=True,
@@ -225,7 +204,7 @@ if __name__ == '__main__':
                         default="exp",
                         help='Path for model and logs')
 
-    # Metadata
+    # Training and test data
     parser.add_argument('--train_list',
                         type=str,
                         default="dataset/train.def.txt",
@@ -264,20 +243,6 @@ if __name__ == '__main__':
                         dest='export',
                         action='store_true',
                         help='export onnx format')
-    
-    ## Evaluation parameters
-    parser.add_argument('--dcf_p_target',   
-                        type=float, 
-                        default=0.05,   
-                        help='A priori probability of the specified target speaker');
-    parser.add_argument('--dcf_c_miss',     
-                        type=float, 
-                        default=1,      
-                        help='Cost of a missed detection');
-    parser.add_argument('--dcf_c_fa',       
-                        type=float, default=1,      
-                        help='Cost of a spurious detection');
-
 
     # For test only
     parser.add_argument('--initial_model_infer',
@@ -314,13 +279,13 @@ if __name__ == '__main__':
                         default='cosine',
                         help='norm or cosine for scoring')
     parser.add_argument('--ref', '-r',
-                       type=str,
-                       default='dataset/test_callbot_raw/test_cb_v1.txt')
+                        type=str,
+                        default='dataset/test_callbot_raw/test_cb_v1.txt')
     parser.add_argument('--com', '-c',
-                       type=str,
-                       default=None,
-                       help='if None, automatic create based on test list name')
-    #--------------------------------------------------------------------------------------#
+                        type=str,
+                        default=None,
+                        help='if None, automatic create based on test list name')
+    #######################################################################################
 
     args = parser.parse_args()
 
@@ -328,27 +293,12 @@ if __name__ == '__main__':
         args = read_config(args.config, args)
 
     # Initialise directories
-    model_save_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/model")
-    os.makedirs(model_save_path, exist_ok=True)
-    result_save_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/result")
-    os.makedirs(result_save_path, exist_ok=True)
-    config_clone_path = os.path.join(args.save_path , f"{args.model}/{args.criterion}/config")
-    if not os.path.exists(config_clone_path):
-        os.makedirs(config_clone_path, exist_ok=True)
-        if args.config is not None:
-            config_dir = '/'.join(str(args.config).split('/')[:-1])
-            subprocess.call(f"cp -R {config_dir}/*.yaml {config_clone_path}", shell=True)
-    if args.do_infer:
+    if args.do_train:
+        model_save_path = args.save_path + f"/{args.model}/{args.criterion}/model"
+        os.makedirs(model_save_path, exist_ok=True)
+        result_save_path = args.save_path + f"/{args.model}/{args.criterion}/result"
+        os.makedirs(result_save_path, exist_ok=True)
+    elif args.do_infer:
         args.com = args.test_list.replace('.txt', '_results.txt') if not args.com else args.com
-       
-
     # Run
-    n_gpus = torch.cuda.device_count()
-
-    print('Python Version:', sys.version)
-    print('PyTorch Version:', torch.__version__)
-    print('Number of GPUs:', torch.cuda.device_count())
-    
     main(args)
-    
-    #######################################################################################
